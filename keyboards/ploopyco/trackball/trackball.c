@@ -46,9 +46,28 @@
 #    define PLOOPY_DRAGSCROLL_MULTIPLIER 0.75 // Variable-DPI Drag Scroll
 #endif
 
+#ifdef PLOOPY_MULTIKEY_KEY
+#ifndef PLOOPY_MULTIKEY_DPIDOWN_KEY
+#if PLOOPY_MULTIKEY_KEY >= KC_MS_BTN4
+#   define PLOOPY_MULTIKEY_DPIDOWN_KEY KC_MS_BTN1
+#else
+#   define PLOOPY_MULTIKEY_DPIDOWN_KEY KC_MS_BTN4
+#endif
+#endif
+#ifndef PLOOPY_MULTIKEY_DPIUP_KEY
+#if PLOOPY_MULTIKEY_KEY >= KC_MS_BTN4
+#   define PLOOPY_MULTIKEY_DPIUP_KEY KC_MS_BTN2
+#else
+#   define PLOOPY_MULTIKEY_DPIUP_KEY KC_MS_BTN5
+#endif
+#endif
+#endif
+
 keyboard_config_t keyboard_config;
 uint16_t          dpi_array[] = PLOOPY_DPI_OPTIONS;
 #define DPI_OPTION_SIZE (sizeof(dpi_array) / sizeof(uint16_t))
+
+#define MAX(x1, x2) (x1 < x2 ? x2 : x1)
 
 // TODO: Implement libinput profiles
 // https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html
@@ -67,6 +86,16 @@ uint16_t lastMidClick      = 0;      // Stops scrollwheel from being read if it 
 uint8_t  OptLowPin         = OPT_ENC1;
 bool     debug_encoder     = false;
 bool     is_drag_scroll    = false;
+bool     multiKeyPressed   = false;
+bool     multiKeyIgnore    = false;
+
+__attribute__((weak)) void update_dpi(void) {
+#ifdef PLOOPY_DRAGSCROLL_FIXED
+    pmw_set_cpi(is_drag_scroll ? PLOOPY_DRAGSCROLL_DPI : dpi_array[keyboard_config.dpi_config]);
+#else
+    pmw_set_cpi(is_drag_scroll ? MAX(dpi_array[keyboard_config.dpi_config] * PLOOPY_DRAGSCROLL_MULTIPLIER, PLOOPY_DRAGSCROLL_DPI) : dpi_array[keyboard_config.dpi_config]);
+#endif
+}
 
 __attribute__((weak)) void process_wheel_user(report_mouse_t* mouse_report, int16_t h, int16_t v) {
     mouse_report->h = h;
@@ -182,10 +211,59 @@ bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
         return false;
     }
 
+#ifdef PLOOPY_MULTIKEY_KEY
+    if (keycode == PLOOPY_MULTIKEY_KEY) {
+        if (record->event.pressed) {
+            multiKeyPressed = true;
+#ifdef PLOOPY_MULTIKEY_DRAGSCROLL
+            is_drag_scroll = true;
+#endif
+            update_dpi();
+            return false;
+        } else {
+            if (!multiKeyIgnore) {
+                if (multiKeyPressed) {
+                    register_code(PLOOPY_MULTIKEY_KEY);
+                }
+
+                unregister_code(PLOOPY_MULTIKEY_KEY);
+            }
+
+            multiKeyPressed = false;
+            multiKeyIgnore = false;
+#ifdef PLOOPY_MULTIKEY_DRAGSCROLL
+            is_drag_scroll = false;
+#endif
+            update_dpi();
+            return false;
+        }
+    }
+
+    if (multiKeyPressed && record->event.pressed) {
+        if (keycode == KC_MS_BTN1) {
+            if (debug_enable) xprintf("dpi down\n");
+            if (keyboard_config.dpi_config > 0) {
+                keyboard_config.dpi_config--;
+            }
+
+            keycode = DPI_CONFIG;
+            multiKeyIgnore = true;
+        } else if (keycode == KC_MS_BTN2) {
+            if (debug_enable) xprintf("dpi up\n");
+            if (keyboard_config.dpi_config < DPI_OPTION_SIZE - 1) {
+                keyboard_config.dpi_config++;
+            }
+
+            keycode = DPI_CONFIG;
+            multiKeyIgnore = true;
+        }
+    }
+#endif
+
     if (keycode == DPI_CONFIG && record->event.pressed) {
-        keyboard_config.dpi_config = (keyboard_config.dpi_config + 1) % DPI_OPTION_SIZE;
         eeconfig_update_kb(keyboard_config.raw);
-        pmw_set_cpi(dpi_array[keyboard_config.dpi_config]);
+        update_dpi();
+        return false;
     }
 
     if (keycode == DRAG_SCROLL) {
@@ -195,11 +273,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
         {
             is_drag_scroll ^= 1;
         }
-#ifdef PLOOPY_DRAGSCROLL_FIXED
-        pmw_set_cpi(is_drag_scroll ? PLOOPY_DRAGSCROLL_DPI : dpi_array[keyboard_config.dpi_config]);
-#else
-        pmw_set_cpi(is_drag_scroll ? (dpi_array[keyboard_config.dpi_config] * PLOOPY_DRAGSCROLL_MULTIPLIER) : dpi_array[keyboard_config.dpi_config]);
-#endif
+
+        update_dpi();
     }
 
 /* If Mousekeys is disabled, then use handle the mouse button
@@ -215,6 +290,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
         } else {
             currentReport.buttons &= ~(1 << (keycode - KC_MS_BTN1));
         }
+
         pointing_device_set_report(currentReport);
         pointing_device_send();
     }
@@ -269,6 +345,13 @@ void pointing_device_task(void) {
     process_mouse(&mouse_report);
 
     if (is_drag_scroll) {
+#ifdef PLOOPY_MULTIKEY_DRAGSCROLL
+        report_mouse_t old_mouse_report = pointing_device_get_report();
+        if (multiKeyPressed && (old_mouse_report.x != mouse_report.x || old_mouse_report.y != mouse_report.y)) {
+            multiKeyIgnore = true;
+        }
+#endif
+
         mouse_report.h = mouse_report.x;
 #ifdef PLOOPY_DRAGSCROLL_INVERT
         // Invert vertical scroll direction
