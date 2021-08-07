@@ -22,7 +22,7 @@
 #    define SCROLL_BUTT_DEBOUNCE 100  // (ms) 			Time between scroll events
 #endif
 #ifndef SCROLL_STOP_MS
-#    define SCROLL_STOP_MS 300 // (ms) Time to wait until we are no longer scrolling
+#    define SCROLL_STOP_MS 300 // (ms) Time to wait until we are no longer considered to be scrolling
 #endif
 #ifndef OPT_THRES
 #    define OPT_THRES 150  // (0-1024) 	Threshold for actication
@@ -47,6 +47,11 @@
 #endif
 #ifndef PLOOPY_SNIPE_DPI
 #    define PLOOPY_SNIPE_DPI 100
+#endif
+
+// Comment this out to disable the multikey
+#ifndef PLOOPY_MULTIKEY_KEY
+#    define PLOOPY_MULTIKEY_KEY KC_MS_BTN5
 #endif
 
 #ifdef PLOOPY_MULTIKEY_KEY
