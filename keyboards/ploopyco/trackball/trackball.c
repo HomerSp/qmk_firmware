@@ -290,9 +290,9 @@ bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
         } else if (keycode == PLOOPY_MULTIKEY_SNIPE_KEY) {
             if (debug_enable) xprintf("snipe toggle\n");
             multiKeySnipe = !multiKeySnipe;
-            if (multiKeySnipe) {
-                is_drag_scroll = false;
-            }
+#ifdef PLOOPY_MULTIKEY_DRAGSCROLL
+            is_drag_scroll = !multiKeySnipe;
+#endif
 
             multiKeyIgnore = true;
             update_dpi();
