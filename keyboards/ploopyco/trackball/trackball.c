@@ -18,6 +18,14 @@
 
 #include "trackball.h"
 
+#define PLOOPY_DPI_OPTIONS { 200, 800, 1600 }
+#define PLOOPY_DPI_DEFAULT 1
+#define PLOOPY_DRAGSCROLL_INVERT 1
+#define PLOOPY_DRAGSCROLL_MULTIPLIER 0.25
+#define PLOOPY_MULTIKEY_KEY KC_MS_BTN5
+#define PLOOPY_MULTIKEY_DRAGSCROLL 1
+#define PLOOPY_SCROLL_IGNORE_FIRST
+
 #ifndef SCROLL_BUTT_DEBOUNCE
 #    define SCROLL_BUTT_DEBOUNCE 100  // (ms) 			Time between scroll events
 #endif
